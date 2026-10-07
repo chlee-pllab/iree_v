@@ -65,6 +65,7 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
                            IREE::HAL::ExecutableTargetAttr targetAttr,
                            detail::TestingResolverKind resolverSource =
                                detail::TestingResolverKind::kNone) {
+  llvm::outs()<<"materializeFuncOpEncodings()\n";
   MLIRContext *ctx = funcOp.getContext();
   {
     DictionaryAttr targetConfig =
@@ -259,6 +260,7 @@ struct MaterializeHostEncodingPass final
   }
 
   void runOnOperation() override {
+    llvm::outs()<<"MaterializeHostEncodingPass::runOnOperation()\n";
     ModuleOp moduleOp = getOperation();
 
     // Run required analysis passes.

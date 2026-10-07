@@ -231,6 +231,7 @@ static LogicalResult verifyLoweringConfiguration(FunctionOpInterface funcOp,
 }
 
 void LLVMCPUSelectLoweringStrategyPass::runOnOperation() {
+  llvm::outs()<<"LLVMCPUSelectLoweringStrategyPass::runOnOperation()\n";
   mlir::ModuleOp moduleOp = getOperation();
   for (auto funcOp : moduleOp.getOps<FunctionOpInterface>()) {
     // Set the strategy with default heuristics.

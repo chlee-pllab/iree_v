@@ -78,6 +78,7 @@ getRootLoweringConfig(FunctionOpInterface funcOp) {
 }
 
 void LLVMCPULowerExecutableTargetPass::runOnOperation() {
+  llvm::outs()<<"LLVMCPULowerExecutableTargetPass::runOnOperation()\n";
   mlir::FunctionOpInterface funcOp = getOperation();
   auto target = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
   if (!target) {
@@ -117,6 +118,7 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
   }
 
   OpPassManager passManager(func::FuncOp::getOperationName());
+  llvm::outs()<<"switch pipeline.\n";
   switch (pipeline) {
   // No pipleline specified, nothing to do.
   case IREE::Codegen::DispatchLoweringPassPipeline::None:
@@ -131,20 +133,26 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
     break;
   }
   case IREE::Codegen::DispatchLoweringPassPipeline::CPUDoubleTilingExpert: {
-    assert(loweringConfig && "expected a valid lowering config");
+    llvm::outs()<<"switch CPUDoubleTilingExpert pipeline.\n";
+    //assert(loweringConfig && "expected a valid lowering config");
     addMultiTilingExpertPassPipeline(passManager, loweringConfig, pipelineOpts);
+    //addCPUDataTilingPipeline(passManager, pipelineOpts);
     break;
   }
   case IREE::Codegen::DispatchLoweringPassPipeline::
       CPUConvTileAndDecomposeExpert: {
-    addConvTileAndDecomposeExpertPassPipeline(passManager, pipelineOpts);
+    llvm::outs()<<"switch CPUConvTileAndDecomposeExpert pipeline.\n";
+    //addConvTileAndDecomposeExpertPassPipeline(passManager, pipelineOpts);
+    addCPUDataTilingPipeline(passManager, pipelineOpts);
     break;
   }
   case IREE::Codegen::DispatchLoweringPassPipeline::Mmt4dTilingExpert: {
+    llvm::outs()<<"switch addMmt4dTilingExpert pipeline.\n";
     addMmt4dTilingExpertPassPipeline(passManager, pipelineOpts);
     break;
   }
   case IREE::Codegen::DispatchLoweringPassPipeline::CPUDataTiling: {
+    llvm::outs()<<"switch addCPUDataTiling pipeline.\n";
     addCPUDataTilingPipeline(passManager, pipelineOpts);
     break;
   }
@@ -154,6 +162,7 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
     break;
   }
   default:
+    llvm::outs()<<"Unsupported pipeline on CPU target.\n";
     funcOp.emitOpError("Unsupported pipeline on CPU target.");
     return signalPassFailure();
   }

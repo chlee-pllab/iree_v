@@ -249,6 +249,83 @@ struct ConvertBatchMmt4DtoMmt4DPattern
   }
 };
 
+struct ConvertConv2DNchwFchwPattern
+    : public OpRewritePattern<linalg::Conv2DNchwFchwOp> {
+  using OpRewritePattern<linalg::Conv2DNchwFchwOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::Conv2DNchwFchwOp op,
+                                PatternRewriter &rewriter) const override {
+    return failure();
+    llvm::outs()<<"ConvertConv2DNchwFchwPattern::matchAndRewrite()\n";
+    auto input = op.getDpsInputOperand(0)->get();
+    auto filter = op.getDpsInputOperand(1)->get();
+    auto output = op.getDpsInitOperand(0)->get();
+
+    auto inputType = cast<RankedTensorType>(input.getType());
+    auto filterType = cast<RankedTensorType>(filter.getType());
+    auto outputType = cast<RankedTensorType>(output.getType());
+
+    SmallVector<int64_t> unitDims;
+    for (int64_t i = 0; i < inputType.getRank(); ++i) {
+      if (inputType.getDimSize(i) == 1) {
+        unitDims.push_back(i);
+      }
+    }
+
+    if (unitDims.empty()) {
+      return failure();
+    }
+
+    Location loc = op.getLoc();
+
+    auto reducedInputType = inputType;
+    for (auto dim : llvm::reverse(unitDims)) {
+      reducedInputType = RankedTensorType::Builder(reducedInputType).dropDim(dim);
+    }
+    auto reducedInput = tensor::createCanonicalRankReducingExtractSliceOp(
+        rewriter, loc, input, reducedInputType);
+
+    auto reducedOutputType = outputType;
+    for (auto dim : llvm::reverse(unitDims)) {
+      if (dim < reducedOutputType.getRank()) {
+        reducedOutputType = RankedTensorType::Builder(reducedOutputType).dropDim(dim);
+      }
+    }
+    auto reducedOutput = tensor::createCanonicalRankReducingExtractSliceOp(
+        rewriter, loc, output, reducedOutputType);
+
+    auto reducedFilterType = filterType;
+    SmallVector<int64_t> filterUnitDims;
+    for (int64_t i = 0; i < 2; ++i) {
+      if (filterType.getDimSize(i) == 1) {
+        filterUnitDims.push_back(i);
+      }
+    }
+    for (auto dim : llvm::reverse(filterUnitDims)) {
+      reducedFilterType = RankedTensorType::Builder(reducedFilterType).dropDim(dim);
+    }
+    auto reducedFilter = tensor::createCanonicalRankReducingExtractSliceOp(
+        rewriter, loc, filter, reducedFilterType);
+
+    auto newConvOp = linalg::Conv2DNchwFchwOp::create(
+        rewriter, loc, reducedOutput.getType(),
+        ValueRange{reducedInput, reducedFilter},
+        ValueRange{reducedOutput});
+
+    if (auto strides = op.getStrides()) {
+      newConvOp.setStridesAttr(strides);
+    }
+    if (auto dilations = op.getDilations()) {
+      newConvOp.setDilationsAttr(dilations);
+    }
+
+    auto insertSliceOp = tensor::createCanonicalRankReducingInsertSliceOp(
+        rewriter, loc, newConvOp.getResult(0), output);
+    rewriter.replaceOp(op, insertSliceOp);
+    return success();
+  }
+};
+
 struct Convert3DPackto2DPackPattern : public OpRewritePattern<linalg::PackOp> {
   using Base::Base;
 
@@ -409,6 +486,7 @@ struct CPUPrepareUkernelsPass
 } // namespace
 
 void CPUPrepareUkernelsPass::runOnOperation() {
+  llvm::outs()<<"CPUPrepareUkernelsPass::runOnOperation()\n";
   MLIRContext *ctx = &getContext();
   RewritePatternSet patterns(ctx);
   mlir::FunctionOpInterface funcOp = getOperation();
@@ -418,6 +496,9 @@ void CPUPrepareUkernelsPass::runOnOperation() {
   if (targetAttr && hasUkernel(targetAttr.getConfiguration(), "mmt4d")) {
     tileBatchDimsForBatchMmt4dOp(rewriter, funcOp);
     patterns.add<ConvertBatchMmt4DtoMmt4DPattern>(ctx);
+  }
+  if (targetAttr && hasUkernel(targetAttr.getConfiguration(), "conv_2d_nchw_fchw")) {
+    patterns.add<ConvertConv2DNchwFchwPattern>(ctx);
   }
   if (targetAttr && hasUkernel(targetAttr.getConfiguration(), "pack")) {
     tileNonPackedDimsFor3DPackOps(rewriter, funcOp);

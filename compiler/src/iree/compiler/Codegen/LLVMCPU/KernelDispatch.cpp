@@ -1365,6 +1365,7 @@ setMatmulPeelingRootConfig(mlir::FunctionOpInterface entryPointFn,
                            ArrayRef<int64_t> cacheTileSizes,
                            ArrayRef<bool> inputVecScalableTileFlags,
                            ArrayRef<int64_t> vecTileSizes, int vectorSize) {
+  llvm::outs()<<"set MatmulPeelingRootConfig\n";
 
   // 0. Preprocess for scalable vectors
   SmallVector<int64_t> roundedVecTileSizes(vecTileSizes);
@@ -1390,8 +1391,8 @@ setMatmulPeelingRootConfig(mlir::FunctionOpInterface entryPointFn,
   generator.setVectorTileSizes(vecTileSizes, vectorScalableFlags);
   IREE::CPU::LoweringConfigAttr loweringConfig =
       generator.generateCPULoweringConfig();
-  LDBG() << "Final tile sizes and scalable flags for contraction: "
-         << loweringConfig;
+  llvm::outs() << "Final tile sizes and scalable flags for contraction: "
+         << loweringConfig<<"\n";
 
   DictionaryAttr pipelineConfig =
       getPipelineConfWithPeelingAttr(op.getContext());
@@ -1409,6 +1410,7 @@ setMatmulRootConfig(mlir::FunctionOpInterface entryPointFn,
                     VectorPreProcStrategy vecPreProcStrategy) {
   assert(vecPreProcStrategy != VectorPreProcStrategy::Peeling &&
          "peeling should go to the setMatmulPeelingRootConfig method");
+  llvm::outs()<<"set MatmulRoogConfig\n";
   SmallVector<int64_t> shape = linalgOp.getStaticLoopRanges();
 
   SmallVector<int64_t> vecTileSizes;
@@ -1440,8 +1442,8 @@ setMatmulRootConfig(mlir::FunctionOpInterface entryPointFn,
   generator.setVectorTileSizes(vecTileSizes, vecScalableFlags);
   IREE::CPU::LoweringConfigAttr loweringConfig =
       generator.generateCPULoweringConfig();
-  LDBG() << "Final tile sizes and scalable flags for contraction: "
-         << loweringConfig;
+  llvm::outs() << "Final tile sizes and scalable flags for contraction: "
+         << loweringConfig<<"\n";
 
   auto pipeline = DispatchLoweringPassPipeline::CPUDoubleTilingExpert;
   return setOpConfigAndEntryPointFnTranslation(entryPointFn, linalgOp,
@@ -1779,6 +1781,7 @@ setContractionRootConfig(mlir::FunctionOpInterface entryPointFn,
   assert(meetLegacyContractionOpInterface(linalgOp) &&
          "expected to have exactly one reduction dim, and it is the innermost "
          "dim");
+  llvm::outs()<<"set ContractionRootConfig\n";
   // Consider all element types and use the smallest vector size. The tiling
   // sizes are chosen based on the vector size.
   auto lhsShapedType =
@@ -1859,7 +1862,7 @@ setContractionRootConfig(mlir::FunctionOpInterface entryPointFn,
   // smaller than `minTileSizes`, so we have to adjust the cache sizes again.
   cacheTileSizes = distTileSizes;
 
-  LDBG() << "Distribution tile sizes: " << distTileSizes;
+  llvm::outs() << "Distribution tile sizes: " << distTileSizes<<"\n";
   LDBG() << "Cache tile sizes: " << cacheTileSizes;
   LDBG() << "Vector tile sizes: " << vecTileSizes;
   LDBG() << "Vector scalable tile flags: " << vecScalableFlags;
@@ -2487,7 +2490,7 @@ setDefaultGenericOpRootConfig(mlir::FunctionOpInterface entryPointFn,
   generator.setVectorTileSizes(vecTileSizes);
   IREE::CPU::LoweringConfigAttr loweringConfig =
       generator.generateCPULoweringConfig();
-  LDBG() << "Set lowering_config: " << loweringConfig;
+  llvm::outs() << "Set lowering_config: " << loweringConfig<<"\n";
 
   // For non-tensor based ops use the Buffer ops pipeline.
   DispatchLoweringPassPipeline passPipeline;
@@ -3019,6 +3022,7 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
 static LogicalResult
 setRootConfigImpl(mlir::FunctionOpInterface entryPointFn, Operation *op,
                   const TargetMLTransformInfo &targetMLTransInfo) {
+  //llvm::outs()<<"setRootConfigImpl.\n";
   // These operations have their own logic of lowering config.
   auto result =
       TypeSwitch<Operation *, LogicalResult>(op)

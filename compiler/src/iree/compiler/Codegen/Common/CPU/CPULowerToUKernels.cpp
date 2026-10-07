@@ -266,6 +266,91 @@ matchDAGForUKernel(RewriterBase &rewriter, linalg::Mmt4DOp op,
 }
 
 static FailureOr<IREE::Codegen::UKernelOpInterface>
+matchDAGForUKernel(RewriterBase &rewriter, linalg::GenericOp op,
+                   bool /*skipIntermediateRoundings*/) {
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
+  const char ukernelName[] = "conv_2d_nchw_fchw";
+  if (!targetAttr || !hasUkernel(targetAttr.getConfiguration(), ukernelName)) {
+    return failure();
+  }
+  if (op.getNumLoops() != 7 || op.getNumParallelLoops() != 4 || op.getNumReductionLoops() != 3) {
+    llvm::outs()<<"Loops: "<<op.getNumLoops()<<" ParallelLoops: "<<op.getNumParallelLoops()<<" ReductionLoops: "<<op.getNumReductionLoops()<<"\n";
+    return failure();
+  }
+  llvm::outs()<<"matchDAGForUKernel Conv2D\n";
+  Value in = op.getDpsInputOperand(0)->get();
+  Value filter = op.getDpsInputOperand(1)->get();
+  Value out = op.getDpsInitOperand(0)->get();
+  auto inType = llvm::cast<ShapedType>(in.getType());
+  auto filterType = llvm::cast<ShapedType>(filter.getType());
+  auto outType = llvm::cast<ShapedType>(out.getType());
+  Type inElemType = inType.getElementType();
+  Type filterElemType = filterType.getElementType();
+  Type outElemType = outType.getElementType();
+  uint32_t flags = 0;
+  if (inElemType.isF32() && filterElemType.isF32() && outElemType.isF32()) {
+    flags = IREE_UK_FLAG_CONV_TYPE_F32F32F32;
+  } else if (inElemType.isF16() && filterElemType.isF16() && outElemType.isF32()) {
+    flags = IREE_UK_FLAG_CONV_TYPE_F16F16F32;
+  } else if (inElemType.isF16() && filterElemType.isF16() && outElemType.isF16()) {
+    flags = IREE_UK_FLAG_CONV_TYPE_F16F16F16;
+  } else if (inElemType.isBF16() && filterElemType.isBF16() && outElemType.isF32()) {
+    flags = IREE_UK_FLAG_CONV_TYPE_BF16BF16F32;
+  } else if (inElemType.isBF16() && filterElemType.isBF16() && outElemType.isBF16()) {
+    flags = IREE_UK_FLAG_CONV_TYPE_BF16BF16BF16;
+  } else if (inElemType.isSignlessInteger(8) && filterElemType.isSignlessInteger(8) &&
+             outElemType.isSignlessInteger(32)) {
+    flags = IREE_UK_FLAG_CONV_TYPE_S8S8S32;
+  } else {
+    return rewriter.notifyMatchFailure(
+        op, "unsupported combination of element types for convolution");
+  }
+
+  if (inType.getRank() != 4) {
+    return rewriter.notifyMatchFailure(op, "expected lhs (image) to be 4D");
+  }
+  if (filterType.getRank() != 4) {
+    return rewriter.notifyMatchFailure(op, "expected rhs (filter) to be 4D");
+  }
+  if (outType.getRank() != 4) {
+    return rewriter.notifyMatchFailure(op, "expected output to be 4D");
+  }
+
+  Location loc = op.getLoc();
+  Value out_size_n = tensor::DimOp::create(rewriter, loc, in, 0);
+  Value in_size_c = tensor::DimOp::create(rewriter, loc, in, 1);
+  Value in_size_h = tensor::DimOp::create(rewriter, loc, in, 2);
+  Value in_size_w = tensor::DimOp::create(rewriter, loc, in, 3);
+  Value out_size_c = tensor::DimOp::create(rewriter, loc, filter, 0);
+  Value filter_size_h = tensor::DimOp::create(rewriter, loc, filter, 2);
+  Value filter_size_w = tensor::DimOp::create(rewriter, loc, filter, 3);
+  Value out_size_h = tensor::DimOp::create(rewriter, loc, out, 2);
+  Value out_size_w = tensor::DimOp::create(rewriter, loc, out, 3);
+  Value tile_size0 = tensor::DimOp::create(rewriter, loc, filter, 2);
+  Value tile_size1 = tensor::DimOp::create(rewriter, loc, filter, 3);
+  Value flagsVal = arith::ConstantOp::create(rewriter, loc,
+                                             rewriter.getI32IntegerAttr(flags));
+  auto fn = getFnNameAndDefAttrs(ukernelName, rewriter, targetAttr);
+  SmallVector<Type> returnTypes =
+      getUKernelGenericReturnTypes(targetAttr, outType);
+  auto genericMicroKernelOp = IREE::Codegen::UKernelGenericOp::create(
+      rewriter, loc, returnTypes, fn.name, ValueRange{in, filter}, out,
+      ValueRange{
+          out_size_n,
+          in_size_c, out_size_c,
+          in_size_h, in_size_w,
+          filter_size_h, filter_size_w,
+          out_size_h, out_size_w,
+          tile_size0, tile_size1,
+          flagsVal
+      },
+      /*fn_def_attrs=*/rewriter.getDictionaryAttr(fn.defAttrs),
+      /*num_strided_outer_dims=*/2);
+  return cast<IREE::Codegen::UKernelOpInterface>(
+      genericMicroKernelOp.getOperation());
+}
+
+static FailureOr<IREE::Codegen::UKernelOpInterface>
 matchDAGForUKernel(RewriterBase &rewriter, linalg::PackOp op,
                    bool /*skipIntermediateRoundings*/) {
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
@@ -610,6 +695,7 @@ struct LowerToUKernelPattern : OpRewritePattern<OpType> {
 
   LogicalResult matchAndRewrite(OpType op,
                                 PatternRewriter &rewriter) const override {
+    llvm::outs()<<"matchAndRewrite()\n";
     if (targetPredicate &&
         !targetPredicate(IREE::HAL::ExecutableTargetAttr::lookup(op))) {
       return failure();
@@ -623,6 +709,7 @@ struct LowerToUKernelPattern : OpRewritePattern<OpType> {
     SmallVector<Value> results = ukernelOp.value()->getResults();
     results.truncate(op->getNumResults());
     rewriter.replaceOp(op, results);
+    llvm::outs()<<"matchAndRewrite() success\n";
     return success();
   }
 
@@ -633,6 +720,7 @@ struct LowerToUKernelPattern : OpRewritePattern<OpType> {
 } // namespace
 
 void CPULowerToUKernelsPass::runOnOperation() {
+  llvm::outs()<<"CPULowerToUKernelPass::runOpOperation()\n";
   MLIRContext *context = &getContext();
   RewritePatternSet patterns(context);
   // Enabling a lowering of an op to a microkernel is a trade-off between the
@@ -649,6 +737,7 @@ void CPULowerToUKernelsPass::runOnOperation() {
   // these ops.
   auto allTargets = [](auto target) { return true; };
   patterns.insert<LowerToUKernelPattern<linalg::Mmt4DOp>,
+                  LowerToUKernelPattern<linalg::GenericOp>,
                   LowerToUKernelPattern<linalg::PackOp>,
                   LowerToUKernelPattern<linalg::UnPackOp>>(
       context, allTargets, skipIntermediateRoundings);

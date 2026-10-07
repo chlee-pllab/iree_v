@@ -226,7 +226,13 @@ void addMultiTilingExpertPassPipeline(
     OpPassManager &funcPassManager,
     IREE::Codegen::LoweringConfigAttrInterface loweringConfig,
     const LLVMCPUPipelineOptions &pipelineOpt) {
+  llvm::outs()<<"add MultiTilingExpertPassPipeline()\n";
   addTileAndDistributePasses(funcPassManager, pipelineOpt);
+
+  funcPassManager.addPass(createCPUPrepareUkernelsPass());
+  funcPassManager.addPass(
+      createCPULowerToUKernelsPass(clSkipIntermediateRoundings));
+
   for (int i : IREE::CPU::getTilingLevelsAsInts()) {
     if (!loweringConfig.hasTilingLevel(i)) {
       continue;
@@ -322,6 +328,7 @@ void addMultiTilingExpertPassPipeline(
 
 void addConvTileAndDecomposeExpertPassPipeline(
     OpPassManager &funcPassManager, const LLVMCPUPipelineOptions &pipelineOpt) {
+  llvm::outs()<<"add ConvTileAndDecomposeExpertPassPipeline()\n";
   addTileAndDistributePasses(funcPassManager, pipelineOpt);
 
   funcPassManager.addPass(createLLVMCPUTileAndFuseProducerConsumerPass(
@@ -432,6 +439,7 @@ void addMmt4dTilingExpertPassPipeline(
 
 void addCPUDataTilingPipeline(OpPassManager &funcPassManager,
                               const LLVMCPUPipelineOptions &pipelineOpt) {
+  llvm::outs()<<"add CPUDataTilingPipeline()\n";
   addTileAndDistributePasses(funcPassManager, pipelineOpt);
 
   // The below two passes are nop if pack/unpack is not specified in ukernels
