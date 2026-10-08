@@ -120,6 +120,19 @@ cc_binary_benchmark(
 )
 
 iree_runtime_cc_test(
+    name = "conv_2d_nchw_fchw_test",
+    srcs = ["conv_2d_nchw_fchw_test.c"],
+    deps = [
+        ":test",
+        ":util",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:flags",
+        "//runtime/src/iree/builtins/ukernel",
+        "//runtime/src/iree/builtins/ukernel:internal_headers",
+    ],
+)
+
+iree_runtime_cc_test(
     name = "pack_test",
     srcs = ["pack_test.c"],
     deps = [

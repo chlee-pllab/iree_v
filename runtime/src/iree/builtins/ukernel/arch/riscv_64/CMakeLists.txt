@@ -23,6 +23,7 @@ iree_bitcode_library(
     "${PROJECT_BINARY_DIR}/runtime/src/iree/schemas/cpu_data_headers_filegroup.stamp"
     "common_riscv_64.h"
     "conv_2d_nchw_fchw_riscv_64_internal.h"
+    "general_riscv_64.h"
     "mmt4d_riscv_64_internal.h"
     "mmt4d_riscv_64_tiles.inl"
     "pack_riscv_64_internal.h"
@@ -44,6 +45,7 @@ iree_bitcode_library(
     "${PROJECT_BINARY_DIR}/runtime/src/iree/schemas/cpu_data_headers_filegroup.stamp"
     "common_riscv_64.h"
     "conv_2d_nchw_fchw_riscv_64_internal.h"
+    "general_riscv_64.h"
     "mmt4d_riscv_64_internal.h"
     "mmt4d_riscv_64_tiles.inl"
     "pack_riscv_64_internal.h"
@@ -51,6 +53,8 @@ iree_bitcode_library(
   SRCS
     "conv_2d_nchw_fchw_riscv_64_base.c"
     "mmt4d_riscv_64_v.c"
+    "pack_riscv_64_base.c"
+    "unpack_riscv_64_base.c"
   COPTS
     "-march=rv64gcv"
 )
@@ -65,6 +69,7 @@ iree_bitcode_library(
     "${PROJECT_BINARY_DIR}/runtime/src/iree/schemas/cpu_data_headers_filegroup.stamp"
     "common_riscv_64.h"
     "conv_2d_nchw_fchw_riscv_64_internal.h"
+    "general_riscv_64.h"
     "mmt4d_riscv_64_internal.h"
     "mmt4d_riscv_64_tiles.inl"
     "pack_riscv_64_internal.h"
@@ -85,6 +90,7 @@ iree_bitcode_library(
     "${PROJECT_BINARY_DIR}/runtime/src/iree/schemas/cpu_data_headers_filegroup.stamp"
     "common_riscv_64.h"
     "conv_2d_nchw_fchw_riscv_64_internal.h"
+    "general_riscv_64.h"
     "mmt4d_riscv_64_internal.h"
     "mmt4d_riscv_64_tiles.inl"
     "pack_riscv_64_internal.h"

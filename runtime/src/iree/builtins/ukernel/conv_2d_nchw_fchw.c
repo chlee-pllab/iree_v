@@ -44,7 +44,7 @@ static bool iree_uk_conv_early(const iree_uk_conv_params_t* params) {
           params->out_size_h == 0 || params->out_size_w == 0);
 }
 
-static void iree_conv_2d_nchw_fchw_using_tile_func_generic(
+static void iree_uk_conv_2d_nchw_fchw_using_tile_func_generic(
     void* IREE_UK_RESTRICT out_tile_ptr,
     const void* IREE_UK_RESTRICT in_tile_ptr, const void* IREE_UK_RESTRICT filter_tile_ptr,
     iree_uk_index_t in_size_c, iree_uk_index_t out_size_c,
@@ -61,11 +61,13 @@ static void iree_conv_2d_nchw_fchw_using_tile_func_generic(
     iree_uk_index_t out_type_size) {
   float* out_ptr = (float*)((char*)out_tile_ptr + 0);
   float sum = 0.0f;
+  iree_uk_index_t stride = ((in_size_w-filter_size_w)/1+1 == out_size_w) ? 1 :
+                           ((in_size_w-filter_size_w)/2+1 == out_size_w) ? 2 : 4;
   for (iree_uk_index_t ic = 0; ic < in_size_c; ic++) {
     for (iree_uk_index_t kh = 0; kh < filter_size_h; kh++) {
       for (iree_uk_index_t kw = 0; kw < filter_size_w; kw++) {
-        iree_uk_index_t ih = oh + kh;
-        iree_uk_index_t iw = ow + kw;
+        iree_uk_index_t ih = oh * stride + kh;
+        iree_uk_index_t iw = ow * stride + kw;
         if (ih >= 0 && ih < in_size_h &&
             iw >= 0 && iw < in_size_w) {
           iree_uk_index_t in_idx = n * in_stride0 +
@@ -86,7 +88,7 @@ static void iree_conv_2d_nchw_fchw_using_tile_func_generic(
   *out_ptr = sum;
 }
 
-static void iree_uk_conv_using_tile_func(const iree_uk_conv_params_t* params,
+static void iree_uk_conv_2d_nchw_fchw_using_tile_func(const iree_uk_conv_params_t* params,
                                           iree_uk_conv_2d_nchw_fchw_tile_func_t tile_func) {
   iree_uk_conv_type_t conv_type = iree_uk_conv_type(params->flags);
   iree_uk_type_t in_type = iree_uk_conv_in_type(conv_type);
@@ -96,11 +98,16 @@ static void iree_uk_conv_using_tile_func(const iree_uk_conv_params_t* params,
   iree_uk_index_t in_type_size = iree_uk_type_size(in_type);
   iree_uk_index_t filter_type_size = iree_uk_type_size(filter_type);
   iree_uk_index_t out_type_size = iree_uk_type_size(out_type);
+
+  //iree_uk_index_t in_stride2 = 0;
+  //while (in_stride2 * in_stride2 < params->in_stride1) in_stride2++;
+  iree_uk_index_t in_stride2 = iree_uk_index_sqrt(params->in_stride1);
   for (iree_uk_index_t n = 0; n < params->out_size_n; n++) {
     for (iree_uk_index_t oc = 0; oc < params->out_size_c; oc++) {
-      for (iree_uk_index_t oh = 0; oh < params->out_size_h; oh++) {
-        for (iree_uk_index_t ow = 0; ow < params->out_size_w; ow++) {
-          iree_uk_index_t out_idx = n * params->out_stride0 +
+      for (iree_uk_index_t oh = 0; oh < params->out_size_h; oh+=params->tile_size0) {
+        for (iree_uk_index_t ow = 0; ow < params->out_size_w; ow+=params->tile_size1) {
+          iree_uk_index_t out_idx = params->out_offset +
+                                    n * params->out_stride0 +
                                     oc * params->out_stride1 +
                                     oh * params->out_size_w +
                                     ow;
@@ -109,28 +116,36 @@ static void iree_uk_conv_using_tile_func(const iree_uk_conv_params_t* params,
                     params->in_size_c, params->out_size_c,
                     n, oc,
                     oh, ow,
-		    params->in_size_h, params->in_size_w,
+                    params->in_size_h, params->in_size_w,
                     params->filter_size_h, params->filter_size_w,
                     params->out_size_h, params->out_size_w,
                     params->tile_size0, params->tile_size1,
-                    params->in_stride0, params->in_stride1,
+                    params->in_stride0, params->in_stride1, in_stride2,
                     params->filter_stride0, params->filter_stride1,
                     params->out_stride0, params->out_stride1,
-                    in_type_size, filter_type_size, out_type_size);
+                    params->in_offset, params->filter_offset,
+                    in_type_size, filter_type_size,
+                    out_type_size, params->flags);
           /*float* out_ptr = (float*)((char*)params->out_buffer + out_idx * out_type_size);
-	  float sum = 0.0f;
+          float sum = (params->flags & IREE_UK_FLAG_CONV_ACCUMULATE) ? (*out_ptr) : 0.0f;
+          iree_uk_index_t stride_h = (((params->in_size_h-params->filter_size_h)/1+1 == params->out_size_h) ? 1 :
+                                    (((params->in_size_h-params->filter_size_h)/2+1 == params->out_size_h) ? 2 : 4));
+          iree_uk_index_t stride_w = (((params->in_size_w-params->filter_size_w)/1+1 == params->out_size_w) ? 1 :
+                                    (((params->in_size_w-params->filter_size_w)/2+1 == params->out_size_w) ? 2 : 4));
           for (iree_uk_index_t ic = 0; ic < params->in_size_c; ic++) {
             for (iree_uk_index_t kh = 0; kh < params->filter_size_h; kh++) {
               for (iree_uk_index_t kw = 0; kw < params->filter_size_w; kw++) {
-                iree_uk_index_t ih = oh + kh;
-                iree_uk_index_t iw = ow + kw;
+                iree_uk_index_t ih = oh * stride_h + kh;
+                iree_uk_index_t iw = ow * stride_w + kw;
                 if (ih >= 0 && ih < params->in_size_h &&
                     iw >= 0 && iw < params->in_size_w) {
-                  iree_uk_index_t in_idx = n * params->in_stride0 +
+                  iree_uk_index_t in_idx = params->in_offset +
+                                          n * params->in_stride0 +
                                           ic * params->in_stride1 +
-                                          ih * params->in_size_w +
+                                          ih * in_stride2 +
                                           iw;
-                  iree_uk_index_t filter_idx = oc * params->filter_stride0 +
+                  iree_uk_index_t filter_idx = params->filter_offset +
+                                              oc * params->filter_stride0 +
                                               ic * params->filter_stride1 +
                                               kh * params->filter_size_w +
                                               kw;
@@ -155,7 +170,7 @@ void iree_uk_conv_p(const iree_uk_conv_params_t* params) {
   if (iree_uk_conv_early(params)) return;
 
   iree_uk_conv_2d_nchw_fchw_tile_func_t tile_func = iree_uk_conv_2d_nchw_fchw_select_tile_func(params);
-  iree_uk_conv_using_tile_func(params, tile_func);
+  iree_uk_conv_2d_nchw_fchw_using_tile_func(params, tile_func);
   //if (1) {
   //  ((float*)(params->out_buffer))[0] = 100000.0;
   //}
@@ -216,11 +231,21 @@ IREE_UK_EXPORT void iree_uk_conv_2d_nchw_fchw(
 }
 
 IREE_UK_EXPORT iree_uk_uint32_t
-iree_uk_conv_2d_nchw_fchw_info(iree_uk_int32_t tile_size0, iree_uk_int32_t tile_size1,
-                  iree_uk_uint32_t flags, const iree_uk_uint64_t* cpu_data) {
+iree_uk_conv_2d_nchw_fchw_info(iree_uk_index_t in_size_c, iree_uk_index_t out_size_c,
+                               iree_uk_index_t in_size_h, iree_uk_index_t in_size_w,
+                               iree_uk_index_t filter_size_h, iree_uk_index_t filter_size_w,
+                               iree_uk_index_t out_size_h, iree_uk_index_t out_size_w,
+                               iree_uk_index_t tile_size0, iree_uk_index_t tile_size1,
+                               iree_uk_uint32_t flags, const iree_uk_uint64_t* cpu_data) {
   iree_uk_conv_params_t params = {
-      .filter_size_h = tile_size0,
-      .filter_size_w = tile_size1,
+      .in_size_c = in_size_c,
+      .out_size_c = out_size_c,
+      .in_size_h = in_size_h,
+      .in_size_w = in_size_w,
+      .filter_size_h = filter_size_h,
+      .filter_size_w = filter_size_w,
+      .out_size_h = out_size_h,
+      .out_size_w = out_size_w,
       .tile_size0 = tile_size0,
       .tile_size1 = tile_size1,
       .flags = flags,

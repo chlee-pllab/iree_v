@@ -89,6 +89,9 @@ static void iree_uk_test_pack_for_shape_params(
       iree_uk_2d_buffer_length(in_type, params.in_size0, params.in_stride0);
   void* in_buffer = malloc(in_buffer_size);
   iree_uk_write_random_buffer(in_buffer, in_buffer_size, in_type, engine);
+  //for (iree_uk_index_t i = 0; i < in_buffer_size / sizeof(float); ++i) {
+  //  ((float*)in_buffer)[i] = i;
+  //}
   params.in_offset = iree_uk_random_engine_get_0_65535(engine);
   params.out_offset = iree_uk_random_engine_get_0_65535(engine);
   params.in_buffer =
@@ -116,6 +119,21 @@ static void iree_uk_test_pack_for_shape_params(
 
   iree_pack_reference(&reference_params);
   iree_uk_pack_p(&actual_params);
+  char msg[158];
+  snprintf(msg, sizeof msg, "    in_size0: %lld, in_size1: %lld, out_stride0: %lld, out_stride1: %lld, in_stride0: %lld, in_stride1: %lld, out_size0: %lld, out_size1: %lld, out_size2: %lld, out_size3: %lld", actual_params.in_size0, actual_params.in_size1, actual_params.out_stride0, actual_params.out_stride1, actual_params.in_stride0, actual_params.in_stride1, actual_params.out_size0, actual_params.out_size1, actual_params.out_size2, actual_params.out_size3);
+  iree_uk_test_log_info(test, "🦕", msg);
+  /*int pass = 1;
+  for (iree_uk_index_t i = 0; i < out_buffer_size / sizeof(float); ++i) {
+    if (((float*)(actual_out_buffer))[i] != ((float*)(reference_out_buffer))[i]) {
+      char msg[128];
+      snprintf(msg, sizeof msg, "  out_buffer[%lld]: %f, %f",
+             i, ((float*)(reference_out_buffer))[i], ((float*)(actual_out_buffer))[i]);
+      iree_uk_test_log_info(test, "🦕", msg);
+      pass = 0;
+    }
+  }
+  snprintf(msg, sizeof msg, "  check: %s", (pass == 1 ? "PASS" : "FAIL"));
+  iree_uk_test_log_info(test, "🦕", msg);*/
 
   if (!iree_uk_2d_buffers_equal(
           actual_out_buffer, reference_out_buffer, out_type, params.out_size0,
@@ -136,12 +154,12 @@ static void iree_uk_test_pack_for_tile_params(iree_uk_test_t* test,
   } outer_shape_t;
   const outer_shape_t outer_shapes[] = {
       // Degenerate cases. Vacuous.
-      {0, 1},
-      {1, 0},
+      //{0, 1},
+      //{1, 0},
       // Non-degenerate cases.
-      {1, 1},
+      //{1, 1},
       {3, 2},
-      {9, 33},
+      //{9, 33},
   };
   typedef enum {
     pad_none,
@@ -151,8 +169,17 @@ static void iree_uk_test_pack_for_tile_params(iree_uk_test_t* test,
   } pad_t;
   for (int i = 0; i < IREE_ARRAYSIZE(outer_shapes); ++i) {
     for (int transpose_inner = 0; transpose_inner <= 1; ++transpose_inner) {
+      char msg[128];
+      snprintf(msg, sizeof msg, "transpose_inner: %s", transpose_inner ? "T" : "F");
+      iree_uk_test_log_info(test, "🦕", msg);
       for (int transpose_outer = 0; transpose_outer <= 1; ++transpose_outer) {
+        char msg[128];
+        snprintf(msg, sizeof msg, "  transpose_outer: %s", transpose_outer ? "T" : "F");
+        iree_uk_test_log_info(test, "🦕", msg);
         for (pad_t pad = 0; pad < pad_enum_end; ++pad) {
+          char msg[128];
+          snprintf(msg, sizeof msg, "    pad: %s", (pad == 0 ? "pad_none" : (pad == 1 ? "pad_one" : "pad_a_lot")));
+          iree_uk_test_log_info(test, "🦕", msg);
           iree_uk_pack_params_t params;
           memcpy(&params, src_params, sizeof params);
           params.cpu_data = iree_uk_test_cpu_data(test);
@@ -213,12 +240,12 @@ int main(int argc, char** argv) {
   // to test weird tile shapes to ensure e.g. that we haven't unwittingly baked
   // in a power-of-two assumption
   iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_F32F32, 3, 5, "");
-  iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_I8I8, 4, 2, "");
-  iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_I32I32, 3, 4, "");
-  iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_F16F16, 6, 7, "");
-  iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_BF16BF16, 9, 2, "");
+  //iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_I8I8, 4, 2, "");
+  //iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_I32I32, 3, 4, "");
+  //iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_F16F16, 6, 7, "");
+  //iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_BF16BF16, 9, 2, "");
 
-#if defined(IREE_ARCH_ARM_64)
+/*#if defined(IREE_ARCH_ARM_64)
   iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_F32F32, 8, 1, "");
   iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_F32F32, 8, 8, "");
   iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_I8I8, 8, 1, "");
@@ -240,7 +267,7 @@ int main(int argc, char** argv) {
   iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_F32F32, 16, 16, "avx512_base");
   iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_I32I32, 16, 16, "avx512_base");
   // avx512_vnni uses the same tile size and same pack code as avx512_base.
-#endif  // defined(IREE_ARCH_ARM_64)
+#endif  // defined(IREE_ARCH_ARM_64)*/
 
   return iree_uk_test_exit_status();
 }

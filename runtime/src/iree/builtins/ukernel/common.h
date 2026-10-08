@@ -593,6 +593,19 @@ static inline int iree_uk_count_leading_zeros_u32(const iree_uk_uint32_t n) {
 #endif  // MSVC / GCC / CLANG
 }
 
+static inline iree_uk_index_t iree_uk_index_sqrt(iree_uk_index_t n) {
+  IREE_UK_ASSERT(n >= 0);
+  if (n == 0) return 0;
+  iree_uk_index_t x = n;
+  iree_uk_index_t y = (x + n / x) / 2;
+  while (y < x) {
+    x = y;
+    y = (x + n / x) / 2;
+  }
+  IREE_UK_ASSERT(x * x == n);
+  return x;
+}
+
 //===----------------------------------------------------------------------===//
 // Power-of-two math helpers
 //===----------------------------------------------------------------------===//

@@ -1484,7 +1484,11 @@ getDefaultMatmulVectorSizes(linalg::LinalgOp op, int64_t vectorSize,
     // and a sequence of vrgather ops to implemement the broadcast explicitly.
     // We should tile and/or unroll that dimension without vectorization, which
     // is not possible right now.
-    sizes.append({8, 32, 1});
+    sizes.append({8, 16, 1});
+
+    if (isScalableVectorizationEnabled()) {
+      scalableSizeFlags.append({false, true, false});
+    }
     return;
   }
 
@@ -1685,8 +1689,10 @@ getMatmulVectorSizes(mlir::FunctionOpInterface entryPointFn,
     if (!isa<linalg::MatmulTransposeBOp, linalg::BatchMatmulTransposeBOp>(
             op.getOperation())) {
       // Try to maximize the vector register utilization rate for matmul.
-      getMatmulRISCVVectorSizes(entryPointFn, op, vectorSize, matmulTileSizes,
-                                matmulScalableFlags);
+      //getMatmulRISCVVectorSizes(entryPointFn, op, vectorSize, matmulTileSizes,
+      //                          matmulScalableFlags);
+      getMatmulVectorSizesUsingFullVectorHeuristics(
+          entryPointFn, op, vectorSize, matmulTileSizes, matmulScalableFlags);
     }
   }
 
@@ -2847,11 +2853,25 @@ setConvRootConfig(mlir::FunctionOpInterface entryPointFn,
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
   if (targetAttr && isAArch64(targetAttr.getConfiguration()) &&
       hasAnySVEFeature(targetAttr.getConfiguration()) &&
+      isScalableVectorizationEnabled()) {
+    if (isa<linalg::DepthwiseConv2DNhwcHwcOp>(convOp)) {
+      auto dims = linalg::inferConvolutionDims(convOp);
+      // Make the channel dim scalable
+      vecScalableFlags[dims->depth[0]] = true;
+    }
+    if (isa<linalg::Conv2DNchwFchwOp>(convOp)) {
+      auto dims = linalg::inferConvolutionDims(convOp);
+      // Make the output channel dim scalable
+      vecScalableFlags[dims->outputChannel[0]] = true;
+    }
+  }
+  if (targetAttr && isRISCV(targetAttr.getConfiguration()) &&
+      hasAnyVFeature(targetAttr.getConfiguration()) &&
       isScalableVectorizationEnabled() &&
-      isa<linalg::DepthwiseConv2DNhwcHwcOp>(convOp)) {
+      isa<linalg::Conv2DNchwFchwOp>(convOp)) {
     auto dims = linalg::inferConvolutionDims(convOp);
-    // Make the channel dim scalable
-    vecScalableFlags[dims->depth[0]] = true;
+    // Make the output channel dim scalable
+    vecScalableFlags[dims->outputChannel[0]] = true;
   }
 
   DictionaryAttr pipelineConfig;

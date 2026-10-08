@@ -10,5 +10,7 @@
 #include "iree/builtins/ukernel/conv_2d_nchw_fchw_internal.h"
 
 IREE_UK_CONV_TILE_FUNC_DECL(iree_uk_conv_tile_generic_riscv_64_direct)
+IREE_UK_CONV_TILE_FUNC_DECL(iree_uk_conv_2d_nchw_fchw_generic_tile_riscv_64)
+IREE_UK_CONV_TILE_FUNC_DECL(iree_uk_conv_2d_nchw_fchw_generic_tile_riscv_64_pack)
 
 #endif  // IREE_BUILTINS_UKERNEL_ARCH_RISCV_64_CONV_RISCV_64_INTERNAL_H_

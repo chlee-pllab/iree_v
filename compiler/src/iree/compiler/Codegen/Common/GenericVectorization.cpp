@@ -36,7 +36,7 @@ getVectorSizes(Operation *op, bool useConfiguredVectorSizes) {
   // Get vector sizes from the lowering config, if available in the op itself.
   IREE::Codegen::LoweringConfigAttrInterface loweringConfig =
       getLoweringConfig(op);
-  if (useConfiguredVectorSizes && loweringConfig) {
+  if (/*useConfiguredVectorSizes && */loweringConfig) {
     LDBG() << "Use configured vector sizes from lowering config";
     std::optional<SmallVector<int64_t>> vectorSizes =
         loweringConfig.getVectorSizes();

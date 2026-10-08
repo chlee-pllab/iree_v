@@ -136,6 +136,20 @@ iree_cc_binary_benchmark(
 
 iree_cc_test(
   NAME
+    conv_2d_nchw_fchw_test
+  SRCS
+    "conv_2d_nchw_fchw_test.c"
+  DEPS
+    ::test
+    ::util
+    iree::base
+    iree::base::internal::flags
+    iree::builtins::ukernel
+    iree::builtins::ukernel::internal_headers
+)
+
+iree_cc_test(
+  NAME
     pack_test
   SRCS
     "pack_test.c"

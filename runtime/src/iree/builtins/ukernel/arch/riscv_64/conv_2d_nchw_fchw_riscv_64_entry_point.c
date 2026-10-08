@@ -12,6 +12,7 @@ iree_uk_conv_2d_nchw_fchw_tile_func_t iree_uk_conv_2d_nchw_fchw_select_tile_func
   // For now, RISC-V implementation returns null, falling back to generic
   // implementation. This can be extended with RISC-V specific optimizations
   // using RISC-V vector extensions (RVV) or other RISC-V specific features.
-  return iree_uk_conv_tile_generic_riscv_64_direct;
+  //return iree_uk_conv_tile_generic_riscv_64_direct;
+  return iree_uk_conv_2d_nchw_fchw_generic_tile_riscv_64;
   return 0;
 }

@@ -116,11 +116,12 @@ typedef void (*iree_uk_conv_2d_nchw_fchw_tile_func_t)(
     iree_uk_index_t filter_size_h, iree_uk_index_t filter_size_w,
     iree_uk_index_t out_size_h, iree_uk_index_t out_size_w,
     iree_uk_index_t tile_size0, iree_uk_index_t tile_size1,
-    iree_uk_index_t in_stride0, iree_uk_index_t in_stride1,
+    iree_uk_index_t in_stride0, iree_uk_index_t in_stride1, iree_uk_index_t in_stride2,
     iree_uk_index_t filter_stride0, iree_uk_index_t filter_stride1,
     iree_uk_index_t out_stride0, iree_uk_index_t out_stride1,
+    iree_uk_index_t in_offset, iree_uk_index_t filter_offset,
     iree_uk_index_t in_type_size, iree_uk_index_t filter_type_size,
-    iree_uk_index_t out_type_size);
+    iree_uk_index_t out_type_size, iree_uk_uint32_t flags);
 
 // Tile kernel declarations
 #define IREE_UK_CONV_TILE_FUNC_DECL(NAME)                             \
@@ -134,11 +135,12 @@ typedef void (*iree_uk_conv_2d_nchw_fchw_tile_func_t)(
             iree_uk_index_t filter_size_h, iree_uk_index_t filter_size_w, \
             iree_uk_index_t out_size_h, iree_uk_index_t out_size_w,     \
             iree_uk_index_t tile_size0, iree_uk_index_t tile_size1,     \
-	    iree_uk_index_t in_stride0, iree_uk_index_t in_stride1,     \
+            iree_uk_index_t in_stride0, iree_uk_index_t in_stride1, iree_uk_index_t in_stride2, \
             iree_uk_index_t filter_stride0, iree_uk_index_t filter_stride1, \
             iree_uk_index_t out_stride0, iree_uk_index_t out_stride1,       \
+            iree_uk_index_t in_offset, iree_uk_index_t filter_offset,       \
             iree_uk_index_t in_type_size, iree_uk_index_t filter_type_size, \
-            iree_uk_index_t out_type_size);
+            iree_uk_index_t out_type_size, iree_uk_uint32_t flags);
 
 // Returns the tile function to use for the conv op with the given params.
 iree_uk_conv_2d_nchw_fchw_tile_func_t iree_uk_conv_2d_nchw_fchw_select_tile_func(

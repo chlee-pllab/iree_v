@@ -29,6 +29,7 @@ if(_IREE_UKERNEL_BITCODE_BUILD_RISCV_64)
 UKERNEL_RISCV_64_INTERNAL_HEADERS = [
     "common_riscv_64.h",
     "conv_2d_nchw_fchw_riscv_64_internal.h",
+    "general_riscv_64.h",
     "mmt4d_riscv_64_internal.h",
     "mmt4d_riscv_64_tiles.inl",
     "pack_riscv_64_internal.h",
@@ -54,6 +55,8 @@ iree_bitcode_library(
     srcs = [
         "conv_2d_nchw_fchw_riscv_64_base.c",
         "mmt4d_riscv_64_v.c",
+        "pack_riscv_64_base.c",
+        "unpack_riscv_64_base.c",
     ],
     arch = "riscv_64",
     copts = ["-march=rv64gcv"],
